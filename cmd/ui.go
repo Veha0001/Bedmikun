@@ -9,9 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// runRootCmdUI contains the main interactive UI logic for the bedmikun application.
-func runRootCmdUI(cmd *cobra.Command, args []string) {
-	logger.Info("Loading...")
+func runBedmikun(cmd *cobra.Command, args []string) {
 	mcInfo, err := GetMinecraftInfo()
 	if err != nil {
 		logger.Fatal("Failed to get Minecraft info", "err", err)
@@ -31,7 +29,7 @@ func runRootCmdUI(cmd *cobra.Command, args []string) {
 				Options(
 					huh.NewOption("Run", ActionRun),
 					huh.NewOption("Patch", ActionPatch),
-					huh.NewOption("Restore Backup", ActionRestore),
+					huh.NewOption("Restore", ActionRestore),
 					huh.NewOption("Exit", ActionExit),
 				).
 				Value(&action),
@@ -43,9 +41,8 @@ func runRootCmdUI(cmd *cobra.Command, args []string) {
 
 	switch action {
 	case ActionRun:
-		exePath := filepath.Join(mcInfo.InstallLocation, "Minecraft.Windows.exe")
-		logger.Info("Launching Minecraft", "path", exePath)
-		execCmd := exec.Command(exePath)
+		logger.Info("Launching Minecraft")
+		execCmd := exec.Command("cmd", "/c", "start", "minecraft:")
 		execCmd.Stdout = os.Stdout
 		execCmd.Stderr = os.Stderr
 		if err := execCmd.Start(); err != nil {
@@ -87,11 +84,22 @@ func runRootCmdUI(cmd *cobra.Command, args []string) {
 			logger.Fatal("Path cannot be empty")
 		}
 
-		if err := PatchFile(path); err != nil {
+		var createBackup bool
+		backupConfirmForm := huh.NewForm(
+			huh.NewGroup(
+				huh.NewConfirm().
+					Title("Create a backup of the original file?").
+					Value(&createBackup),
+			),
+		)
+
+		if err := backupConfirmForm.Run(); err != nil {
+			logger.Fatal("UI failed", "err", err)
+		}
+
+		if err := PatchFile(path, createBackup); err != nil {
 			logger.Fatal("Failed to patch file", "err", err)
 		}
-		logger.Info("Patch complete")
-		// Directory deletion functionality removed per user request.
 
 	case ActionRestore:
 		var useDetectedPath bool
@@ -130,10 +138,9 @@ func runRootCmdUI(cmd *cobra.Command, args []string) {
 		if err := RestoreFile(path); err != nil {
 			logger.Fatal("Failed to restore file", "err", err)
 		}
-		logger.Info("Restore complete")
 
 	case ActionExit:
-		logger.Info("Exiting")
+		logger.Info("Exiting...")
 		return
 
 	default:

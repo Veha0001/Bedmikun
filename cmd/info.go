@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/charmbracelet/huh"
 )
 
 type McAppInfo struct {
@@ -23,6 +25,21 @@ func GetMinecraftInfo() (*McAppInfo, error) {
 	}
 	clean := strings.TrimSpace(string(out))
 	if clean == "" || clean == "null" {
+		var openStore bool
+		form := huh.NewForm(
+			huh.NewGroup(
+				huh.NewConfirm().
+					Title("Minecraft Bedrock not found.").
+					Description("Would you like to open the Microsoft Store to install it?").
+					Value(&openStore),
+			),
+		)
+		err := form.Run()
+		if err == nil && openStore {
+			exec.Command("explorer", "ms-windows-store://pdp/?productid=9NBLGGH2JHXJ").Start()
+			return nil, fmt.Errorf("opening Microsoft Store, please install and restart")
+		}
+
 		return nil, fmt.Errorf("minecraft uwp not found")
 	}
 

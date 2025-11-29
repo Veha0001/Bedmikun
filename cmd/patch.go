@@ -1,190 +1,265 @@
 package cmd
 
 import (
-	"bytes"
-	"debug/pe"
-	"encoding/hex"
+	"errors"
 	"fmt"
-	"io"
 	"os"
+	"strconv"
 	"strings"
 )
 
-// PatchInstruction defines a single patching operation.
-type PatchInstruction struct {
-	SearchPatternHex string // The pattern to find in the executable as a hex string
-	FindBytes        []byte // The bytes to find within the SearchPattern
-	ReplaceBytes     []byte // The bytes to replace FindBytes with
+// idaPattern holds the bytes and masks for a pattern.
+type idaPattern struct {
+	pattern []byte
+	mask    []byte
 }
 
-// parseHexString converts a hex string with optional '??' wildcards into a byte slice.
-func parseHexString(hexString string) ([]byte, error) {
-	parts := strings.Fields(hexString)
-	var result []byte
-	for _, part := range parts {
-		if part == "??" {
-			result = append(result, '?') // Use '?' as our wildcard byte
-		} else {
-			b, err := hex.DecodeString(part)
-			if err != nil {
-				return nil, fmt.Errorf("invalid hex string part: %s, %w", part, err)
-			}
-			result = append(result, b...)
-		}
-	}
-	return result, nil
+type patchSignature struct {
+	find    idaPattern
+	replace idaPattern
 }
 
-
-// getArchitecture detects the architecture of the PE file.
-func getArchitecture(filePath string) (string, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to open file: %w", err)
-	}
-	defer file.Close()
-
-	peFile, err := pe.NewFile(file)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse PE file: %w", err)
-	}
-	defer peFile.Close()
-
-	switch peFile.FileHeader.Machine {
-	case pe.IMAGE_FILE_MACHINE_AMD64:
-		return "x64", nil
-	case pe.IMAGE_FILE_MACHINE_I386:
-		return "x86", nil
-	default:
-		return "unknown", nil
-	}
-}
-
-// PatchFile creates a backup of the original file, then patches it.
-func PatchFile(filePath string) error {
-	arch, err := getArchitecture(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to detect architecture: %w", err)
-	}
-	logger.Infof("Detected binary architecture: %s", arch)
-
-	// Define all patching instructions.
-	// The SearchPattern corresponds to the full signature including B0 01.
-	// FindBytes is the sequence to locate *within* the found SearchPattern.
-	// ReplaceBytes is what FindBytes will be changed to.
-	allPatchInstructions := map[string][]PatchInstruction{
-		"x64": {
-			{
-				SearchPattern: func() []byte {
-					p, err := parseHexString("10 84 ?? ?? 15 B0 01 48 8B 4C ?? ?? 48 33 ?? ?? ?? ?? ?? ?? 48 83 C4 40 5B C3 48 8B ?? ?? ?? ?? 48 89")
-					if err != nil {
-						panic(fmt.Sprintf("failed to parse x64 sig1: %v", err))
-					}
-					return p
-				}(),
-				FindBytes:    []byte{0xB0, 0x01},
-				ReplaceBytes: []byte{0xB0, 0x00},
-			},
-			{
-				SearchPattern: func() []byte {
-					p, err := parseHexString("84 C0 74 23 48 83 C3 10 48 3B DF 75 E3 B0 01 48")
-					if err != nil {
-						panic(fmt.Sprintf("failed to parse x64 sig2: %v", err))
-					}
-					return p
-				}(),
-				FindBytes:    []byte{0xB0, 0x01},
-				ReplaceBytes: []byte{0xB0, 0x00},
-			},
+var signatures = map[string][]patchSignature{
+	"x64": {
+		// Signature 1: Changes a conditional jump related to trial mode.
+		// Original: 15 B0 01 ... 48 89
+		// Patched:  15 B0 00 ... 48 89
+		{
+			find:    parseIDAPattern("15 B0 01 48 8B 4C ?? ?? 48 33 ?? ?? ?? ?? ?? ?? 48 83 C4 40 5B C3 48 8B ?? ?? ?? ?? ?? 48 89"),
+			replace: parseIDAPattern("15 B0 00 48 8B 4C ?? ?? 48 33 ?? ?? ?? ?? ?? ?? 48 83 C4 40 5B C3 48 8B ?? ?? ?? ?? ?? 48 89"),
 		},
-	}
+		// Signature 2: Another trial check bypass.
+		// Original: 84 C0 74 ... B0 01
+		// Patched:  84 C0 74 ... B0 00
+		{
+			find:    parseIDAPattern("84 C0 74 23 48 83 C3 10 48 3B DF 75 E3 B0 01 48"),
+			replace: parseIDAPattern("84 C0 74 23 48 83 C3 10 48 3B DF 75 E3 B0 00 48"),
+		},
+	},
+}
 
-	patchInstructions, ok := allPatchInstructions[arch]
-	if !ok || len(patchInstructions) == 0 {
-		return fmt.Errorf("no patching instructions found for %s architecture", arch)
-	}
+// parseIDAPattern converts a libhat-style pattern string into a byte pattern and a mask.
+func parseIDAPattern(pattern string) idaPattern {
+	parts := strings.Fields(pattern)
+	pBytes := make([]byte, 0, len(parts))
+	mBytes := make([]byte, 0, len(parts))
 
-	backupPath := filePath + ".bak"
-	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
-		// create backup if it doesn't exist
-		originalData, err := os.ReadFile(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to read original file for backup: %w", err)
+	for _, part := range parts {
+		var p, m byte
+		switch len(part) {
+		case 1:
+			if part == "?" {
+				p, m = 0x00, 0x00
+			}
+		case 2:
+			if part == "??" {
+				p, m = 0x00, 0x00
+			} else if part[0] == '?' { // ?B
+				val, err := strconv.ParseUint(string(part[1]), 16, 4)
+				if err == nil {
+					p, m = byte(val), 0x0F
+				}
+			} else if part[1] == '?' { // A?
+				val, err := strconv.ParseUint(string(part[0]), 16, 4)
+				if err == nil {
+					p, m = byte(val<<4), 0xF0
+				}
+			} else { // AB
+				val, err := strconv.ParseUint(part, 16, 8)
+				if err == nil {
+					p, m = byte(val), 0xFF
+				}
+			}
+		case 8: // Binary string
+			maskStr := strings.Map(func(r rune) rune {
+				if r == '?' {
+					return '0'
+				}
+				return '1'
+			}, part)
+			valStr := strings.ReplaceAll(part, "?", "0")
+
+			maskVal, err1 := strconv.ParseUint(maskStr, 2, 8)
+			val, err2 := strconv.ParseUint(valStr, 2, 8)
+
+			if err1 == nil && err2 == nil {
+				p, m = byte(val&maskVal), byte(maskVal)
+			}
 		}
-		if err := os.WriteFile(backupPath, originalData, 0644); err != nil {
-			return fmt.Errorf("failed to write backup file: %w", err)
-		}
-		logger.Infof("Created backup at %s", backupPath)
+		pBytes = append(pBytes, p)
+		mBytes = append(mBytes, m)
+	}
+	return idaPattern{pattern: pBytes, mask: mBytes}
+}
+
+// findPattern searches for a pattern in data using a mask.
+func findPattern(data []byte, pat idaPattern) [][]int {
+	var results [][]int
+	pattern := pat.pattern
+	mask := pat.mask
+	patternLen := len(pattern)
+
+	if patternLen == 0 {
+		return results
 	}
 
-	content, err := os.ReadFile(filePath)
+	for i := 0; i <= len(data)-patternLen; i++ {
+		match := true
+		for j := 0; j < patternLen; j++ {
+			if (data[i+j] & mask[j]) != pattern[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			results = append(results, []int{i, i + patternLen})
+		}
+	}
+	return results
+}
+
+// PatchFile finds and replaces byte signatures in the target file.
+func PatchFile(targetPath string, backup bool) error {
+	logger.Info("Starting patch process...", "file", targetPath)
+	if backup {
+		backupPath := targetPath + ".bak"
+		if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+			logger.Info("Creating backup...", "to", backupPath)
+			if err := copyFile(targetPath, backupPath); err != nil {
+				return err // copyFile already returns a descriptive error
+			}
+		} else {
+			logger.Info("Backup file already exists, skipping creation.", "backup", backupPath)
+		}
+	}
+
+	data, err := os.ReadFile(targetPath)
 	if err != nil {
 		return err
 	}
 
-	patched := false
-	for _, instr := range patchInstructions {
-		offset := findSignature(content, instr.SearchPattern)
-		if offset != -1 {
-			logger.Infof("Found pattern at offset 0x%X", offset)
-			// Search for FindBytes within the found pattern's region
-			findOffset := bytes.Index(content[offset:offset+len(instr.SearchPattern)], instr.FindBytes)
-			if findOffset != -1 {
-				// Apply replacement
-				// The +1 is to target the byte after B0, which is the 01 we want to change to 00
-				// This assumes FindBytes is always 2 bytes and we want to change the second byte.
-				// If FindBytes can be of arbitrary length and we want to replace the whole sequence,
-				// the logic here needs to be more generic. For B0 01 -> B0 00, this is fine.
-				if len(instr.FindBytes) == 2 && len(instr.ReplaceBytes) == 2 {
-					content[offset+findOffset+1] = instr.ReplaceBytes[1]
-					logger.Infof("Patched pattern at offset 0x%X (original find offset 0x%X)", offset+findOffset, findOffset)
-					patched = true
-				} else {
-					logger.Warnf("Patch instruction for pattern at 0x%X has FindBytes/ReplaceBytes of unexpected length. FindBytes: %d, ReplaceBytes: %d", offset, len(instr.FindBytes), len(instr.ReplaceBytes))
-				}
-			}
-		}
+	modified := false
+	patchCount := 0
+	sigs, ok := signatures["x64"] // Assuming x64 for now
+	if !ok {
+		return errors.New("no signatures found for architecture x64")
 	}
 
-	if !patched {
-		logger.Warn("Could not find any of the signatures to patch.")
+	for i, sig := range sigs {
+		locs := findPattern(data, sig.find)
+		if len(locs) == 0 {
+			logger.Warn(fmt.Sprintf("Not found: %X", sig.find.pattern), "signature_index", i+1)
+			continue
+		}
+
+		logger.Debug("Signature found. Patching...", "signature_index", i+1, "occurrences", len(locs))
+
+		for _, loc := range locs {
+			start := loc[0]
+			end := loc[1]
+			originalSlice := data[start:end]
+
+			logger.Debug(fmt.Sprintf("Found: %X", sig.find.pattern))
+			logger.Debug(fmt.Sprintf("Replace: %X", sig.replace.pattern))
+
+			replacementBytes := getReplacementBytes(sig.replace, originalSlice)
+			if len(replacementBytes) != len(originalSlice) {
+				logger.Error("Mismatch in pattern length, skipping patch for this occurrence to avoid corruption.", "signature_index", i+1)
+				continue
+			}
+			copy(data[start:end], replacementBytes)
+			logger.Info(fmt.Sprintf(" > Offset: 0x%X", start))
+			patchCount++
+		}
+		modified = true
+	}
+
+	if !modified {
+		logger.Warn("No signatures were found in the file. The file might already be patched or is an unsupported version.")
 		return nil
 	}
 
-	return os.WriteFile(filePath, content, 0644)
-}
-
-// RestoreFile restores the executable from a backup.
-func RestoreFile(filePath string) error {
-	backupPath := filePath + ".bak"
-	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
-		return fmt.Errorf("no backup file found at %s", backupPath)
+	if err := os.WriteFile(targetPath, data, 0666); err != nil {
+		return err
 	}
 
-	backupData, err := os.ReadFile(backupPath)
-	if err != nil {
-		return fmt.Errorf("failed to read backup file: %w", err)
-	}
-
-	if err := os.WriteFile(filePath, backupData, 0644); err != nil {
-		return fmt.Errorf("failed to restore from backup: %w", err)
-	}
-	logger.Infof("Restored %s from %s", filePath, backupPath)
+	logger.Info("Patching complete.", "total_patches", patchCount)
 	return nil
 }
 
-func findSignature(data []byte, signature []byte) int {
-	for i := 0; i <= len(data)-len(signature); i++ {
-		found := true
-		for j := 0; j < len(signature); j++ {
-			if signature[j] != '?' && data[i+j] != signature[j] {
-				found = false
-				break
-			}
+// RestoreFile finds and reverts patched byte signatures in the target file.
+func RestoreFile(targetPath string) error {
+	logger.Info("Starting restore process...", "file", targetPath)
+
+	data, err := os.ReadFile(targetPath)
+	if err != nil {
+		return err
+	}
+
+	modified := false
+	restoreCount := 0
+	sigs, ok := signatures["x64"] // Assuming x64 for now
+	if !ok {
+		return errors.New("no signatures found for architecture x64")
+	}
+
+	for i, sig := range sigs {
+		// In restore, we find the "replace" pattern and replace it with the "find" pattern.
+		locs := findPattern(data, sig.replace)
+		if len(locs) == 0 {
+			// This is not a warning in restore, as some signatures might not have been applied.
+			continue
 		}
-		if found {
-			return i
+
+		logger.Debug("Found patched signature. Restoring...", "signature_index", i+1, "occurrences", len(locs))
+
+		for _, loc := range locs {
+			start := loc[0]
+			end := loc[1]
+			originalSlice := data[start:end]
+
+			logger.Debug(fmt.Sprintf("Found: %X", sig.replace.pattern))
+			logger.Debug(fmt.Sprintf("Replace: %X", sig.find.pattern))
+
+			// We use sig.find to get the original bytes.
+			replacementBytes := getReplacementBytes(sig.find, originalSlice)
+			if len(replacementBytes) != len(originalSlice) {
+				// This should ideally not happen if signatures are correct.
+				logger.Error("Mismatch in pattern length, skipping restore for this occurrence to avoid corruption.", "signature_index", i+1)
+				continue
+			}
+			copy(data[start:end], replacementBytes)
+			logger.Info(fmt.Sprintf(" > Offset: 0x%X", start))
+			restoreCount++
+		}
+		modified = true
+	}
+
+	if !modified {
+		logger.Warn("No patched signatures were found in the file. The file might not be patched or is an unsupported version.")
+		return nil
+	}
+
+	if err := os.WriteFile(targetPath, data, 0666); err != nil {
+		return err
+	}
+
+	logger.Info("Restore complete.", "total_restored", restoreCount)
+	return nil
+}
+
+// getReplacementBytes creates the byte slice for replacement, preserving wildcards from the original.
+func getReplacementBytes(replace idaPattern, originalSlice []byte) []byte {
+	result := make([]byte, len(replace.pattern))
+	copy(result, replace.pattern) // Start with the replacement pattern
+
+	// Apply wildcards: where mask is 0, use original byte
+	for i := 0; i < len(result); i++ {
+		if replace.mask[i] != 0xFF {
+			// This handles full wildcards (0x00) and partials (e.g., 0xF0, 0x0F)
+			// Keep original byte where replace mask is not full
+			result[i] = (originalSlice[i] & ^replace.mask[i]) | (replace.pattern[i] & replace.mask[i])
 		}
 	}
-	return -1
+	return result
 }

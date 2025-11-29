@@ -4,10 +4,12 @@ Copyright © 2025 @Veha0001
 package cmd
 
 import (
-	"os"
-
+	"context"
+	"fmt"
+	"github.com/charmbracelet/fang"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
+	"os"
 )
 
 const (
@@ -22,15 +24,25 @@ var logger = log.New(os.Stderr)
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "bedmikun",
-	Short: "a program provide no trial on bedrock",
-	Long:  `Bedmikun u`,
-	Run:   runRootCmdUI, // Call the function moved to cmd/ui.go
+	Short: "A program provide no trial on bedrock.",
+	Long:  "A penguin trying to break bedrock, with a diamond pickaxe.",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		logger.Info("Loading...")
+	},
+	Run: runBedmikun,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	err := rootCmd.Execute()
+	// Run Actions on click
+	if len(os.Args) == 1 {
+		runBedmikun(rootCmd, []string{})
+		fmt.Println("\nPress Enter to exit...")
+		fmt.Scanln()
+		return
+	}
+	err := fang.Execute(context.Background(), rootCmd)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -41,8 +53,8 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.bedmikun.yaml)")
-
+	//rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.bedmikun.yaml)")
+	rootCmd.PersistentFlags().BoolP("play", "g", false, "Play the game.")
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 }

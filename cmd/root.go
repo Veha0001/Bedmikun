@@ -16,6 +16,7 @@ const (
 	ActionRun     = "run"
 	ActionPatch   = "patch"
 	ActionRestore = "restore"
+	ActionManager = "managethrid"
 	ActionExit    = "exit"
 )
 

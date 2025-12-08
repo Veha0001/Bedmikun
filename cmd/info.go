@@ -10,19 +10,26 @@ import (
 )
 
 type McAppInfo struct {
-	InstallLocation   string `json:"install_location"`
+	InstallLocation   string `json:"installLocation"`
 	Name              string `json:"name"`
 	Version           string `json:"version"`
-	PackageFamilyName string `json:"package_family_name"`
+	PackageFamilyName string `json:"packageFamilyName"`
 }
 
 func GetMinecraftInfo() (*McAppInfo, error) {
+	// Run PowerShell command with error handling and verbose output
 	cmd := exec.Command("powershell", "-NoProfile", "-Command",
-		`Get-AppxPackage -Name Microsoft.MinecraftUWP | Select-Object InstallLocation, Name, Version, PackageFamilyName | ConvertTo-Json -Depth 3`)
-	out, err := cmd.Output()
+		`Get-AppxPackage -Name Microsoft.MinecraftUWP -ErrorAction Stop |
+         Select-Object InstallLocation, Name, Version, PackageFamilyName |
+         ConvertTo-Json -Depth 3`)
+
+	// Capture both stdout and stderr
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("pwsh failed: %w", err)
+		return nil, fmt.Errorf("failed to execute PowerShell command: %w\nOutput: %s", err, string(out))
 	}
+
+	// Clean up the output (trim any unwanted whitespace)
 	clean := strings.TrimSpace(string(out))
 	if clean == "" || clean == "null" {
 		var openStore bool
@@ -34,30 +41,29 @@ func GetMinecraftInfo() (*McAppInfo, error) {
 					Value(&openStore),
 			),
 		)
-		err := form.Run()
-		if err == nil && openStore {
-			exec.Command("explorer", "ms-windows-store://pdp/?productid=9NBLGGH2JHXJ").Start()
-			return nil, fmt.Errorf("opening Microsoft Store, please install and restart")
+		if err := form.Run(); err == nil && openStore {
+			// Open the Microsoft Store to install Minecraft
+			_ = exec.Command("cmd", "/C", "start", "ms-windows-store://pdp/?productid=9NBLGGH2JHXJ").Run()
+			return nil, fmt.Errorf("Minecraft not found, opening Microsoft Store for installation")
 		}
-
-		return nil, fmt.Errorf("minecraft uwp not found")
+		return nil, fmt.Errorf("Minecraft UWP not found. Please install it via the Microsoft Store")
 	}
 
-	// Handle array or single object
-	if strings.HasPrefix(clean, "[") {
-		var arr []McAppInfo
-		if err := json.Unmarshal([]byte(clean), &arr); err != nil {
-			return nil, fmt.Errorf("json parse array: %w\nraw=%s", err, clean)
+	// Debug: Output the raw content to check what's being returned
+	logger.Debug("Raw PowerShell Output:\n", clean)
+
+	// Try unmarshaling as an array first
+	var arr []McAppInfo
+	if err := json.Unmarshal([]byte(clean), &arr); err == nil {
+		if len(arr) > 0 {
+			return &arr[0], nil
 		}
-		if len(arr) == 0 {
-			return nil, fmt.Errorf("no Minecraft package found")
-		}
-		return &arr[0], nil
 	}
 
+	// If array parsing fails, try unmarshaling as a single object
 	var info McAppInfo
 	if err := json.Unmarshal([]byte(clean), &info); err != nil {
-		return nil, fmt.Errorf("json parse object: %w\nraw=%s", err, clean)
+		return nil, fmt.Errorf("failed to parse JSON response: %w\nRaw output: %s", err, clean)
 	}
 	return &info, nil
 }

@@ -1,28 +1,19 @@
 package cmd
 
 import (
+	"github.com/charmbracelet/huh"
+	"github.com/spf13/cobra"
 	"os"
 	"os/exec"
 	"path/filepath"
-
-	"github.com/charmbracelet/huh"
-	"github.com/spf13/cobra"
+	"runtime"
 )
 
+var mcInfo *McAppInfo
+
 func runBedmikun(cmd *cobra.Command, args []string) {
-	mcInfo, err := GetMinecraftInfo()
-	if err != nil {
-		logger.Fatal("Failed to get Minecraft info", "err", err)
-	}
-
-	// Debug: full path
-	logger.Debug("Minecraft installed at", "path", mcInfo.InstallLocation)
-
-	// Info: only version
-	logger.Info("Minecraft installed", "version", mcInfo.Version)
-
 	var action string
-	err = huh.NewForm(
+	err := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("Select Action").
@@ -30,6 +21,7 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 					huh.NewOption("Run", ActionRun),
 					huh.NewOption("Patch", ActionPatch),
 					huh.NewOption("Restore", ActionRestore),
+					huh.NewOption("Manage (Third party)", ActionManager),
 					huh.NewOption("Exit", ActionExit),
 				).
 				Value(&action),
@@ -39,7 +31,30 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 		logger.Fatal("UI failed", "err", err)
 	}
 
+	switch runtime.GOOS {
+	case "windows":
+		mcInfo, err := GetMinecraftInfo()
+		if err != nil {
+			logger.Fatal("Failed to get Minecraft info", "err", err)
+		} else if mcInfo == nil {
+			logger.Fatal("Minecraft is not installed or could not be found")
+		}
+		// Debug: full path
+		logger.Debug("Minecraft installed at", "path", mcInfo.InstallLocation)
+		// Info: only version
+		logger.Info("Minecraft installed", "version", mcInfo.Version)
+	default:
+		mcInfo = &McAppInfo{
+			InstallLocation: "",
+			Version:         "",
+		}
+	}
 	switch action {
+
+	case ActionExit:
+		logger.Info("Exiting...")
+		return
+
 	case ActionRun:
 		logger.Info("Launching Minecraft")
 		execCmd := exec.Command("cmd", "/c", "start", "minecraft:")
@@ -100,6 +115,8 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 		if err := PatchFile(path, createBackup); err != nil {
 			logger.Fatal("Failed to patch file", "err", err)
 		}
+	case ActionManager:
+		UIManager()
 
 	case ActionRestore:
 		var useDetectedPath bool
@@ -138,10 +155,6 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 		if err := RestoreFile(path); err != nil {
 			logger.Fatal("Failed to restore file", "err", err)
 		}
-
-	case ActionExit:
-		logger.Info("Exiting...")
-		return
 
 	default:
 		logger.Info("Unknown action")

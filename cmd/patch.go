@@ -13,7 +13,6 @@ type idaPattern struct {
 	pattern []byte
 	mask    []byte
 }
-
 type patchSignature struct {
 	find    idaPattern
 	replace idaPattern

@@ -6,13 +6,36 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 )
 
 var mcInfo *McAppInfo
 
+func OpenBedrock() {
+	logger.Info("Launching Minecraft")
+	execCmd := exec.Command("cmd", "/c", "start", "minecraft:")
+	execCmd.Stdout = os.Stdout
+	execCmd.Stderr = os.Stderr
+	if err := execCmd.Start(); err != nil {
+		logger.Fatal("Failed to launch Minecraft", "err", err)
+	}
+	logger.Info("Minecraft started")
+}
+func clioptrunner() {
+
+	if cmdletplay {
+		OpenBedrock()
+	}
+
+	if cmdwinpatch {
+		if err := PatchFile("Minecraft.Windows.exe", false); err != nil {
+			logger.Fatal("Failed to patch file", "err", err)
+		}
+	}
+	os.Exit(0)
+}
 func runBedmikun(cmd *cobra.Command, args []string) {
 	var action string
+	clioptrunner()
 	err := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
@@ -31,23 +54,17 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 		logger.Fatal("UI failed", "err", err)
 	}
 
-	switch runtime.GOOS {
-	case "windows":
-		mcInfo, err := GetMinecraftInfo()
-		if err != nil {
-			logger.Fatal("Failed to get Minecraft info", "err", err)
-		} else if mcInfo == nil {
-			logger.Fatal("Minecraft is not installed or could not be found")
-		}
+	mcInfo, err := GetMinecraftInfo()
+	if err != nil {
+		logger.Fatal("Failed to get Minecraft info", "err", err)
+	} else if mcInfo == nil {
+		logger.Fatal("Minecraft is not installed or could not be found")
+	}
+	if mcInfo != nil {
 		// Debug: full path
 		logger.Debug("Minecraft installed at", "path", mcInfo.InstallLocation)
 		// Info: only version
 		logger.Info("Minecraft installed", "version", mcInfo.Version)
-	default:
-		mcInfo = &McAppInfo{
-			InstallLocation: "",
-			Version:         "",
-		}
 	}
 	switch action {
 
@@ -56,14 +73,7 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 		return
 
 	case ActionRun:
-		logger.Info("Launching Minecraft")
-		execCmd := exec.Command("cmd", "/c", "start", "minecraft:")
-		execCmd.Stdout = os.Stdout
-		execCmd.Stderr = os.Stderr
-		if err := execCmd.Start(); err != nil {
-			logger.Fatal("Failed to launch Minecraft", "err", err)
-		}
-		logger.Info("Minecraft started")
+		OpenBedrock()
 
 	case ActionPatch:
 		var useDetectedPath bool
@@ -116,12 +126,12 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 			logger.Fatal("Failed to patch file", "err", err)
 		}
 	case ActionManager:
-		UIManager()
+		UIManager(*mcInfo)
 
 	case ActionRestore:
 		var useDetectedPath bool
 		autodetectedPath := filepath.Join(mcInfo.InstallLocation, "Minecraft.Windows.exe")
-		path := autodetectedPath // Initialize path with the autodetected value
+		path := filepath.Base(autodetectedPath) // Initialize path with the autodetected value
 
 		confirmForm := huh.NewForm(
 			huh.NewGroup(

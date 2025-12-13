@@ -19,7 +19,11 @@ const (
 	ActionManager = "managethrid"
 	ActionExit    = "exit"
 )
-
+var Version string = "devel"
+var (
+	cmdletplay  bool
+	cmdwinpatch bool
+)
 var logger = log.New(os.Stderr)
 
 // rootCmd represents the base command when called without any subcommands
@@ -30,7 +34,8 @@ var rootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		logger.Info("Loading...")
 	},
-	Run: runBedmikun,
+	Run:     runBedmikun,
+	Version: Version,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -53,9 +58,10 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
-
+	rootCmd.SetVersionTemplate("Bedmikun, version: " + Version)
 	//rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.bedmikun.yaml)")
-	rootCmd.PersistentFlags().BoolP("play", "g", false, "Play the game.")
+	rootCmd.PersistentFlags().BoolVarP(&cmdletplay, "play", "g", false, "Play the game.")
+	rootCmd.PersistentFlags().BoolVarP(&cmdwinpatch, "patch", "w", false, "Patch the Minecraft.Windows.exe here.")
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 }

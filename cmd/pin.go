@@ -3,10 +3,18 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/charmbracelet/huh"
-	"github.com/google/go-github/v80/github"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/charmbracelet/huh"
+	"github.com/google/go-github/v80/github"
+)
+
+var (
+	roaming     = os.Getenv("APPDATA")
+	bedrockData = filepath.Join(roaming, "Minecraft Bedrock")
 )
 
 func FetchLatestGitApi(owner, repo, prefix string) (string, error) {
@@ -29,9 +37,10 @@ func FetchLatestGitApi(owner, repo, prefix string) (string, error) {
 	return "", fmt.Errorf("no asset found with prefix %q in release %s", prefix, release.GetTagName())
 }
 
-func UIManager() {
+func UIManager(McAppInfo) {
 	var action string
 	var rolling []string
+	var bedrockHere bool
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
@@ -49,6 +58,10 @@ func UIManager() {
 				Title("Choose to take on").
 				Description("Those are thrid party from github, any risk is your responsible.").
 				Value(&rolling),
+			huh.NewConfirm().
+				Title("Is Minecraft Windows here?").
+				Description("This find Minecraft Windows for installation.").
+				Value(&bedrockHere),
 		),
 	).
 		WithWidth(45).
@@ -58,6 +71,8 @@ func UIManager() {
 	if err != nil {
 		logger.Fatal(err)
 	}
+	var dest string
+	moddll := filepath.Join(bedrockData, "mod")
 	switch action {
 	case "Install":
 		if slices.Contains(rolling, "modloader") {
@@ -67,6 +82,12 @@ func UIManager() {
 			} else {
 				logger.Debug("Download URL", "url", url)
 				logger.Info("Getting: alteik/Modloader")
+				dest = "vcruntime140_1.dll"
+				if bedrockHere {
+					dest = filepath.Join(mcInfo.InstallLocation, "vcruntime140_1.dll")
+				}
+				GetDownload(url, dest)
+				logger.Info("Downloaded=", dest)
 			}
 		}
 		if slices.Contains(rolling, "mcforfree") {
@@ -76,10 +97,22 @@ func UIManager() {
 			} else {
 				logger.Debug("Download URL", "url", url)
 				logger.Info("Getting: alteik/MinecraftForFree")
+				dest = filepath.Join(moddll, "MinecraftForFree.dll")
+				GetDownload(url, dest)
+				logger.Info("Downloaded=", dest)
 			}
 		}
-		logger.Info("didnt added yet.")
 	case "UnInstall":
-		logger.Warn("This will changes the .dll to .bak")
+		if slices.Contains(rolling, "modloader") {
+			dest = "vcruntime140_1.dll"
+			if bedrockHere {
+				dest = filepath.Join(mcInfo.InstallLocation, "vcruntime140_1.dll")
+			}
+			logger.Warn("Deleted=", dest)
+		}
+		if slices.Contains(rolling, "mcforfree") {
+			dest = filepath.Join(moddll, "MinecraftForFree.dll")
+			logger.Warn("Deleted=", dest)
+		}
 	}
 }

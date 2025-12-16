@@ -18,12 +18,6 @@ builds:
     ldflags:
       - "-s -w "
 
-metadata:
-  commit_author:
-    # NOTE: I LOVE CHARM
-    name: "Charm"
-    email: "charmcli@users.noreply.github.com"
-    
 archives:
   - formats: [tar.gz]
     # this name template makes the OS and Arch compatible with the results of `uname`.

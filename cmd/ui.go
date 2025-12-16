@@ -21,17 +21,17 @@ func OpenBedrock() {
 	logger.Info("Minecraft started")
 }
 func clioptrunner() {
-
 	if cmdletplay {
 		OpenBedrock()
+		os.Exit(0)
 	}
 
 	if cmdwinpatch {
 		if err := PatchFile("Minecraft.Windows.exe", false); err != nil {
 			logger.Fatal("Failed to patch file", "err", err)
 		}
+		os.Exit(0)
 	}
-	os.Exit(0)
 }
 func runBedmikun(cmd *cobra.Command, args []string) {
 	var action string
@@ -44,7 +44,7 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 					huh.NewOption("Run", ActionRun),
 					huh.NewOption("Patch", ActionPatch),
 					huh.NewOption("Restore", ActionRestore),
-					huh.NewOption("Manage (Third party)", ActionManager),
+					huh.NewOption("Manage Mods (Third party)", ActionManager),
 					huh.NewOption("Exit", ActionExit),
 				).
 				Value(&action),

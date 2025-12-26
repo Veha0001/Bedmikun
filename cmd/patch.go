@@ -104,7 +104,7 @@ func findPattern(data []byte, pat idaPattern) [][]int {
 
 	for i := 0; i <= len(data)-patternLen; i++ {
 		match := true
-		for j := 0; j < patternLen; j++ {
+		for j := range pattern {
 			if (data[i+j] & mask[j]) != pattern[j] {
 				match = false
 				break
@@ -253,7 +253,7 @@ func getReplacementBytes(replace idaPattern, originalSlice []byte) []byte {
 	copy(result, replace.pattern) // Start with the replacement pattern
 
 	// Apply wildcards: where mask is 0, use original byte
-	for i := 0; i < len(result); i++ {
+	for i := range result {
 		if replace.mask[i] != 0xFF {
 			// This handles full wildcards (0x00) and partials (e.g., 0xF0, 0x0F)
 			// Keep original byte where replace mask is not full

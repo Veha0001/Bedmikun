@@ -16,13 +16,13 @@ const (
 	ActionRun     = "run"
 	ActionPatch   = "patch"
 	ActionRestore = "restore"
-	ActionManager = "managethrid"
 	ActionExit    = "exit"
 )
+
 var Version string = "devel"
 var (
-	cmdletplay  bool
-	cmdwinpatch bool
+	cmd_play     bool
+	cmd_winpatch bool
 )
 var logger = log.New(os.Stderr)
 
@@ -60,8 +60,8 @@ func init() {
 	// will be global for your application.
 	rootCmd.SetVersionTemplate("Bedmikun, version: " + Version)
 	//rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.bedmikun.yaml)")
-	rootCmd.PersistentFlags().BoolVarP(&cmdletplay, "play", "g", false, "Play the game.")
-	rootCmd.PersistentFlags().BoolVarP(&cmdwinpatch, "patch", "w", false, "Patch the Minecraft.Windows.exe here.")
+	rootCmd.PersistentFlags().BoolVarP(&cmd_play, "play", "g", false, "Play the game.")
+	rootCmd.PersistentFlags().BoolVarP(&cmd_winpatch, "patch", "w", false, "Patch the Minecraft.Windows.exe here.")
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 }

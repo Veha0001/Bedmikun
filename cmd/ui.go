@@ -4,38 +4,27 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 	"os"
-	"os/exec"
 	"path/filepath"
 )
 
-var mcInfo *McAppInfo
-
-func OpenBedrock() {
-	logger.Info("Launching Minecraft")
-	execCmd := exec.Command("cmd", "/c", "start", "minecraft:")
-	execCmd.Stdout = os.Stdout
-	execCmd.Stderr = os.Stderr
-	if err := execCmd.Start(); err != nil {
-		logger.Fatal("Failed to launch Minecraft", "err", err)
-	}
-	logger.Info("Minecraft started")
-}
-func clioptrunner() {
-	if cmdletplay {
-		OpenBedrock()
-		os.Exit(0)
-	}
-
-	if cmdwinpatch {
+func runBedmikun(cmd *cobra.Command, args []string) {
+	var action string
+	if cmd_winpatch {
 		if err := PatchFile("Minecraft.Windows.exe", false); err != nil {
 			logger.Fatal("Failed to patch file", "err", err)
 		}
 		os.Exit(0)
 	}
-}
-func runBedmikun(cmd *cobra.Command, args []string) {
-	var action string
-	clioptrunner()
+	if cmd_play {
+		mcbe, err := GetMinecraftInfo()
+		if err != nil {
+			logger.Fatal("Failed to get Minecraft info", "err", err)
+		} else if mcbe == nil {
+			logger.Fatal("Minecraft is not installed or could not be found")
+		}
+		DRunBedrock(*mcbe)
+		os.Exit(0)
+	}
 	err := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
@@ -44,7 +33,6 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 					huh.NewOption("Run", ActionRun),
 					huh.NewOption("Patch", ActionPatch),
 					huh.NewOption("Restore", ActionRestore),
-					huh.NewOption("Manage Mods (Third party)", ActionManager),
 					huh.NewOption("Exit", ActionExit),
 				).
 				Value(&action),
@@ -73,12 +61,13 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 		return
 
 	case ActionRun:
-		OpenBedrock()
+		DRunBedrock(*mcInfo)
 
 	case ActionPatch:
 		var useDetectedPath bool
 		autodetectedPath := filepath.Join(mcInfo.InstallLocation, "Minecraft.Windows.exe")
 		path := autodetectedPath // Initialize path with the autodetected value
+		basename := filepath.Base(path)
 
 		confirmForm := huh.NewForm(
 			huh.NewGroup(
@@ -97,12 +86,13 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 				huh.NewGroup(
 					huh.NewInput().
 						Title("Enter path to Minecraft.Windows.exe").
-						Value(&path),
+						Value(&basename),
 				),
 			)
 			if err := inputForm.Run(); err != nil {
 				logger.Fatal("UI failed", "err", err)
 			}
+			path = basename
 		}
 
 		if path == "" {
@@ -125,13 +115,12 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 		if err := PatchFile(path, createBackup); err != nil {
 			logger.Fatal("Failed to patch file", "err", err)
 		}
-	case ActionManager:
-		UIManager(*mcInfo)
 
 	case ActionRestore:
 		var useDetectedPath bool
 		autodetectedPath := filepath.Join(mcInfo.InstallLocation, "Minecraft.Windows.exe")
-		path := filepath.Base(autodetectedPath) // Initialize path with the autodetected value
+		path := autodetectedPath // Initialize path with the autodetected value
+		basename := filepath.Base(path)
 
 		confirmForm := huh.NewForm(
 			huh.NewGroup(
@@ -150,12 +139,13 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 				huh.NewGroup(
 					huh.NewInput().
 						Title("Enter path to Minecraft.Windows.exe to restore").
-						Value(&path),
+						Value(&basename),
 				),
 			)
 			if err := inputForm.Run(); err != nil {
 				logger.Fatal("UI failed", "err", err)
 			}
+			path = basename
 		}
 
 		if path == "" {

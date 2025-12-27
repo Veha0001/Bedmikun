@@ -2,15 +2,16 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/charmbracelet/bubbles/progress"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/bubbles/progress"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // NOTE: https://github.com/charmbracelet/bubbletea/blob/main/examples/progress-download/
@@ -116,27 +117,49 @@ func (m tea_dl_model) View() string {
 		pad + m.progress.View() + "\n\n" +
 		pad + helpStyle("Press any key to quit")
 }
-func GetDownload(url string, dest string) {
+func GetDownload(url string, dest string) error {
 	if url == "" {
-		logger.Fatal("URL: Must not be empty.")
-		os.Exit(1)
+		return fmt.Errorf("URL: must not be empty")
 	}
+
 	resp, err := getResponse(url)
 	if err != nil {
-		logger.Error("could not get response", err)
-		os.Exit(1)
+		return fmt.Errorf("could not get response: %w", err)
 	}
 	defer resp.Body.Close() // nolint:errcheck
+
 	if resp.ContentLength <= 0 {
-		fmt.Println("can't parse content length, aborting download")
-		os.Exit(1)
+		return fmt.Errorf("can't parse content length for url %s", url)
 	}
 
 	filename := filepath.Base(url)
-	file, err := os.Create(filename)
+
+	var outPath string
+	if dest == "" {
+		outPath = filename
+	} else {
+		// If dest is a directory (exists and is dir), place file inside it
+		if fi, err := os.Stat(dest); err == nil && fi.IsDir() {
+			outPath = filepath.Join(dest, filename)
+		} else if strings.HasSuffix(dest, string(os.PathSeparator)) {
+			// dest ends with separator, treat as directory
+			if err := os.MkdirAll(dest, 0o755); err != nil {
+				return err
+			}
+			outPath = filepath.Join(dest, filename)
+		} else {
+			// treat dest as a file path
+			outPath = dest
+		}
+	}
+
+	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+		return err
+	}
+
+	file, err := os.Create(outPath)
 	if err != nil {
-		fmt.Println("could not create file:", err)
-		os.Exit(1)
+		return fmt.Errorf("could not create file %s: %w", outPath, err)
 	}
 	defer file.Close() // nolint:errcheck
 
@@ -145,7 +168,10 @@ func GetDownload(url string, dest string) {
 		file:   file,
 		reader: resp.Body,
 		onProgress: func(ratio float64) {
-			p.Send(progressMsg(ratio))
+			// send progress to the UI program
+			if p != nil {
+				p.Send(progressMsg(ratio))
+			}
 		},
 	}
 	m := tea_dl_model{
@@ -156,9 +182,10 @@ func GetDownload(url string, dest string) {
 	go pw.Start()
 
 	if _, err := p.Run(); err != nil {
-		fmt.Println("error running program:", err)
-		os.Exit(1)
+		return fmt.Errorf("error running progress UI: %w", err)
 	}
+
+	return nil
 }
 
 // copyFile copies a file from src to dst.

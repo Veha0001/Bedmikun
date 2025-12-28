@@ -1,3 +1,4 @@
+# yamllint disable-file
 # This is an example .goreleaser.yml file with some sensible defaults.
 # Make sure to check the documentation at https://goreleaser.com
 
@@ -5,7 +6,7 @@
 # Feel free to remove those if you don't want/need to use them.
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
-
+---
 version: 2
 
 builds:
@@ -13,11 +14,12 @@ builds:
       - CGO_ENABLED=0
     goos:
       - windows
-      - linux
     flags:
       - "-trimpath"
     ldflags:
       - "-s -w "
+  - targets:
+      - "windows_amd64"
 
 archives:
   - formats: [tar.gz]
@@ -44,6 +46,8 @@ changelog:
       - "^test:"
 
 release:
+  replace_existing_artifacts: true
+  make_latest: true
   prerelease: auto
   footer: >-
 

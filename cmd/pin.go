@@ -185,79 +185,48 @@ func generateTagCandidates(tag string) []string {
 
 func DRunBedrock(mcbe McAppInfo) {
 	pack := filepath.Join(mcbe.InstallLocation, "main.exe")
-	data, resolvedTag, err := FetchGitAssetsbyTag("bubbles-wow", "mcbe-gdk-unpack-archive", "Minecraft.Windows.exe", mcbe.Version)
-	if err != nil {
-		logger.Error("failed to fetch release by tag", "requested", mcbe.Version, "err", err)
+	// If main.exe exists, run it immediately
+	if _, err := os.Stat(pack); err == nil {
+		logger.Info("Found existing main.exe, launching", "path", pack)
+		execCmd := exec.Command(pack)
+		execCmd.Stdout = os.Stdout
+		execCmd.Stderr = os.Stderr
+		if err := execCmd.Start(); err != nil {
+			logger.Fatal("Failed to launch Minecraft", "err", err)
+		}
+		logger.Info("Minecraft started")
+		return
 	}
 
-	// read current saved version and patched flag from config.ini
-	cfgVer, cfgPatched, err := readConfig()
-	if err != nil {
-		logger.Error("reading config", err)
+	// main.exe not found -> attempt to download
+	data, _, err := FetchGitAssetsbyTag("bubbles-wow", "mcbe-gdk-unpack-archive", "Minecraft.Windows.exe", mcbe.Version)
+	if err != nil || data == "" {
+		logger.Error("no downloadable asset found for requested or variant tags", "requested", mcbe.Version, "err", err)
+		return
 	}
 
-	if versionsMatch(cfgVer, mcbe.Version) {
-		logger.Info("Version matches config, skipping download", "version", mcbe.Version)
-		// Only patch if file exists and is not already marked patched
-		if cfgPatched {
-			logger.Info("patched", "file", pack)
-		} else {
-			if _, err := os.Stat(pack); err == nil {
-				if err := PatchFile(pack, true); err != nil {
-					logger.Error("patch failed", "err", err)
-				} else {
-					logger.Info("patched", "file", pack)
-					// mark patched in config
-					if err := writeConfig(cfgVer, true); err != nil {
-						logger.Error("failed to write config", err)
-					}
-				}
-			} else {
-				logger.Warn("main.exe not found, skipping patch", "path", pack)
+	logger.Info("Downloading latest bedrock", "url", data, "dest", pack)
+	if err := GetDownload(data, pack); err != nil {
+		logger.Error("download failed", err)
+		// If download failed but main.exe exists, run it
+		if _, statErr := os.Stat(pack); statErr == nil {
+			logger.Warn("download failed, running existing main.exe", "path", pack)
+			execCmd := exec.Command(pack)
+			execCmd.Stdout = os.Stdout
+			execCmd.Stderr = os.Stderr
+			if err := execCmd.Start(); err != nil {
+				logger.Fatal("Failed to launch Minecraft", "err", err)
 			}
+			logger.Info("Minecraft started")
+			return
 		}
-	} else {
-		if err != nil || data == "" {
-			// If we couldn't fetch and an existing main.exe is present, run it offline
-			if _, statErr := os.Stat(pack); statErr == nil {
-				logger.Warn("offline or no asset; running existing main.exe", "path", pack)
-				// don't attempt to download or patch
-			} else {
-				logger.Error("no downloadable asset found for requested or variant tags", "requested", mcbe.Version)
-			}
-		} else {
-			logger.Info("Downloading latest bedrock", "url", data, "dest", pack)
-			if err := GetDownload(data, pack); err != nil {
-				logger.Error("download failed", err)
-				// If download failed but main.exe exists, run it
-				if _, statErr := os.Stat(pack); statErr == nil {
-					logger.Warn("download failed, running existing main.exe", "path", pack)
-				}
-			} else {
-				// prefer the resolved tag if available, otherwise fall back to requested
-				tagToWrite := mcbe.Version
-				if resolvedTag != "" {
-					tagToWrite = resolvedTag
-				}
-				// write version even if patch fails
-				if err := writeConfig(tagToWrite, false); err != nil {
-					logger.Error("failed to write config", err)
-				}
-				// Attempt to patch the downloaded main.exe
-				if _, err := os.Stat(pack); err == nil {
-					if err := PatchFile(pack, true); err != nil {
-						logger.Error("patch failed", "err", err)
-					} else {
-						logger.Info("patched", "file", pack)
-						if err := writeConfig(tagToWrite, true); err != nil {
-							logger.Error("failed to write config", err)
-						}
-					}
-				} else {
-					logger.Warn("downloaded file not found after download", "path", pack)
-				}
-			}
-		}
+		return
+	}
+
+	// Attempt to patch the downloaded main.exe (backup disabled)
+	if err := PatchFile(pack, false); err != nil {
+		logger.Error("patch failed", "err", err)
+		// still try to launch the downloaded file
 	}
 
 	logger.Info("Launching Minecraft")
@@ -268,55 +237,6 @@ func DRunBedrock(mcbe McAppInfo) {
 		logger.Fatal("Failed to launch Minecraft", "err", err)
 	}
 	logger.Info("Minecraft started")
-}
-
-// readConfigVersion reads ./config.ini and returns the value for a "version=" key if present
-// readConfig reads ./config.ini and returns the version and whether it's patched
-func readConfig() (string, bool, error) {
-	b, err := os.ReadFile("config.ini")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", false, nil
-		}
-		return "", false, err
-	}
-	s := string(b)
-	var ver string
-	var patched bool
-	for _, line := range strings.Split(s, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "[") {
-			continue
-		}
-		if strings.HasPrefix(strings.ToLower(line), "version=") {
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 {
-				ver = strings.TrimSpace(parts[1])
-			}
-			continue
-		}
-		if strings.HasPrefix(strings.ToLower(line), "patched=") {
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 {
-				val := strings.TrimSpace(strings.ToLower(parts[1]))
-				if val == "1" || val == "true" || val == "yes" {
-					patched = true
-				}
-			}
-		}
-	}
-	return ver, patched, nil
-}
-
-// writeConfigVersion writes a simple config with the version key
-// writeConfig writes version and patched flag to config.ini
-func writeConfig(v string, patched bool) error {
-	p := "0"
-	if patched {
-		p = "1"
-	}
-	content := fmt.Sprintf("version=%s\npatched=%s\n", v, p)
-	return os.WriteFile("config.ini", []byte(content), 0o644)
 }
 
 // versionsMatch compares two version strings and returns true when they should be

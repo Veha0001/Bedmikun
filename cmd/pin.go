@@ -189,24 +189,28 @@ func DRunBedrock(mcbe McAppInfo) {
 	pack := filepath.Join(mcbe.InstallLocation, "main.exe")
 	// If main.exe exists, ask the user whether to Play, Reinstall, or Cancel
 	if _, err := os.Stat(pack); err == nil {
-		var action string
+		var confirm bool
 		form := huh.NewForm(
 			huh.NewGroup(
-				huh.NewSelect[string]().
-					Title("Minecraft found - select action").
-					Options(
-						huh.NewOption("Play", "play"),
-						huh.NewOption("Reinstall", "reinstall"),
-						huh.NewOption("Cancel", "cancel"),
-					).
-					Value(&action),
+				huh.NewConfirm().
+					Title("Found a patched Minecraft Bedrock.").
+					Affirmative("Reinstall.").
+					Negative("Play it!").
+					Value(&confirm),
 			),
 		)
 		if err := form.Run(); err != nil {
 			logger.Fatal("UI failed", "err", err)
 		}
-		switch action {
-		case "play":
+
+		if confirm { // User selected "Reinstall"
+			logger.Info("Reinstall selected; removing existing file...", "path", pack)
+			if err := os.Remove(pack); err != nil {
+				logger.Fatal("failed to remove existing file; continuing", "err", err)
+				os.Exit(1)
+			}
+			// continue to download flow
+		} else { // User selected "Play it!"
 			logger.Info("Found existing main.exe, launching...", "path", pack)
 			execCmd := exec.Command(pack)
 			execCmd.Stdout = os.Stdout
@@ -215,19 +219,6 @@ func DRunBedrock(mcbe McAppInfo) {
 				logger.Fatal("Failed to launch Minecraft", "err", err)
 			}
 			logger.Info("Minecraft Bedrock started.")
-			return
-		case "reinstall":
-			logger.Info("Reinstall selected; removing existing file...", "path", pack)
-			if err := os.Remove(pack); err != nil {
-				logger.Fatal("failed to remove existing file; continuing", "err", err)
-				os.Exit(1)
-			}
-			// continue to download flow
-		case "cancel":
-			logger.Info("Cancelled by user")
-			return
-		default:
-			logger.Info("No selection made; cancelling")
 			return
 		}
 	}

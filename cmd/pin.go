@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/huh"
+
 	"github.com/google/go-github/v80/github"
 )
 
@@ -185,17 +187,49 @@ func generateTagCandidates(tag string) []string {
 
 func DRunBedrock(mcbe McAppInfo) {
 	pack := filepath.Join(mcbe.InstallLocation, "main.exe")
-	// If main.exe exists, run it immediately
+	// If main.exe exists, ask the user whether to Play, Reinstall, or Cancel
 	if _, err := os.Stat(pack); err == nil {
-		logger.Info("Found existing main.exe, launching", "path", pack)
-		execCmd := exec.Command(pack)
-		execCmd.Stdout = os.Stdout
-		execCmd.Stderr = os.Stderr
-		if err := execCmd.Start(); err != nil {
-			logger.Fatal("Failed to launch Minecraft", "err", err)
+		var action string
+		form := huh.NewForm(
+			huh.NewGroup(
+				huh.NewSelect[string]().
+					Title("Minecraft found - select action").
+					Options(
+						huh.NewOption("Play", "play"),
+						huh.NewOption("Reinstall", "reinstall"),
+						huh.NewOption("Cancel", "cancel"),
+					).
+					Value(&action),
+			),
+		)
+		if err := form.Run(); err != nil {
+			logger.Fatal("UI failed", "err", err)
 		}
-		logger.Info("Minecraft started")
-		return
+		switch action {
+		case "play":
+			logger.Info("Found existing main.exe, launching...", "path", pack)
+			execCmd := exec.Command(pack)
+			execCmd.Stdout = os.Stdout
+			execCmd.Stderr = os.Stderr
+			if err := execCmd.Start(); err != nil {
+				logger.Fatal("Failed to launch Minecraft", "err", err)
+			}
+			logger.Info("Minecraft Bedrock started.")
+			return
+		case "reinstall":
+			logger.Info("Reinstall selected; removing existing file...", "path", pack)
+			if err := os.Remove(pack); err != nil {
+				logger.Fatal("failed to remove existing file; continuing", "err", err)
+				os.Exit(1)
+			}
+			// continue to download flow
+		case "cancel":
+			logger.Info("Cancelled by user")
+			return
+		default:
+			logger.Info("No selection made; cancelling")
+			return
+		}
 	}
 
 	// main.exe not found -> attempt to download
@@ -205,7 +239,7 @@ func DRunBedrock(mcbe McAppInfo) {
 		return
 	}
 
-	logger.Info("Downloading latest bedrock", "url", data, "dest", pack)
+	logger.Info("Downloading Minecraft Bedrock.", "url", data, "dest", pack)
 	if err := GetDownload(data, pack); err != nil {
 		logger.Error("download failed", err)
 		// If download failed but main.exe exists, run it
@@ -217,7 +251,7 @@ func DRunBedrock(mcbe McAppInfo) {
 			if err := execCmd.Start(); err != nil {
 				logger.Fatal("Failed to launch Minecraft", "err", err)
 			}
-			logger.Info("Minecraft started")
+			logger.Info("Minecraft Bedrock started.")
 			return
 		}
 		return
@@ -229,14 +263,14 @@ func DRunBedrock(mcbe McAppInfo) {
 		// still try to launch the downloaded file
 	}
 
-	logger.Info("Launching Minecraft")
+	logger.Info("Launching Minecraft Bedrock...")
 	execCmd := exec.Command(pack)
 	execCmd.Stdout = os.Stdout
 	execCmd.Stderr = os.Stderr
 	if err := execCmd.Start(); err != nil {
 		logger.Fatal("Failed to launch Minecraft", "err", err)
 	}
-	logger.Info("Minecraft started")
+	logger.Info("Minecraft Bedrock started.")
 }
 
 // versionsMatch compares two version strings and returns true when they should be

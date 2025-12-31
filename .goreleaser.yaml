@@ -10,7 +10,8 @@
 version: 2
 
 builds:
-  - env:
+  - id: bedmikun
+    env:
       - CGO_ENABLED=0
     goos:
       - windows
@@ -18,7 +19,7 @@ builds:
       - "-trimpath"
     ldflags:
       - "-s -w "
-  - targets:
+    targets:
       - "windows_amd64"
 
 archives:

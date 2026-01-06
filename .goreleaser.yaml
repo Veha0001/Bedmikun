@@ -22,6 +22,12 @@ builds:
     targets:
       - "windows_amd64"
 
+signs:
+  - id: bedmikun
+    artifacts: checksum
+    signature: ${artifact}.asc
+    cmd: gpg
+
 archives:
   - formats: [tar.gz]
     # this name template makes the OS and Arch compatible with the results of `uname`.

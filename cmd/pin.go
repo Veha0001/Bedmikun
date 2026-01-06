@@ -151,8 +151,9 @@ func generateTagCandidates(tag string) []string {
 	variants := []string{base}
 
 	// without leading v
-	if strings.HasPrefix(base, "v") {
-		variants = append(variants, strings.TrimPrefix(base, "v"))
+
+	if v, ok := strings.CutPrefix(base, "v"); ok {
+		variants = append(variants, v)
 	}
 
 	// drop last segment

@@ -7,8 +7,12 @@ import (
 	"path/filepath"
 )
 
+var (
+	useDetectedPath bool
+	action          string
+)
+
 func runBedmikun(cmd *cobra.Command, args []string) {
-	var action string
 	if cmd_winpatch {
 		if err := PatchFile("Minecraft.Windows.exe", false); err != nil {
 			logger.Fatal("Failed to patch file", "err", err)
@@ -36,7 +40,7 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 					huh.NewOption("Exit", ActionExit),
 				).
 				Value(&action),
-		),
+		).Title("Bedmikun - Bedrock unpaid patcher.").Description("Free selection to go."),
 	).Run()
 	if err != nil {
 		logger.Fatal("UI failed", "err", err)
@@ -54,6 +58,7 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 		// Info: only version
 		logger.Info("Minecraft installed", "version", mcInfo.Version)
 	}
+
 	switch action {
 
 	case ActionExit:
@@ -64,7 +69,6 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 		DRunBedrock(*mcInfo)
 
 	case ActionPatch:
-		var useDetectedPath bool
 		autodetectedPath := filepath.Join(mcInfo.InstallLocation, "Minecraft.Windows.exe")
 		path := autodetectedPath // Initialize path with the autodetected value
 		basename := filepath.Base(path)

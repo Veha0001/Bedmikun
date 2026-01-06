@@ -28,12 +28,9 @@ var logger = log.New(os.Stderr)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "bedmikun",
-	Short: "A program provide no trial on bedrock.",
-	Long:  "A penguin trying to break bedrock, with a diamond pickaxe.",
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		logger.Info("Loading...")
-	},
+	Use:     "bedmikun",
+	Short:   "A program provide no trial on bedrock.",
+	Long:    "A penguin trying to break bedrock, with a diamond pickaxe.",
 	Run:     runBedmikun,
 	Version: Version,
 }
@@ -41,7 +38,6 @@ var rootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	// Run Actions on click
 	if len(os.Args) == 1 {
 		runBedmikun(rootCmd, []string{})
 		fmt.Println("\nPress Enter to exit...")

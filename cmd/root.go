@@ -5,11 +5,11 @@ package cmd
 
 import (
 	"context"
-	"fmt"
+	"os"
+
 	"github.com/charmbracelet/fang"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 const (
@@ -21,8 +21,8 @@ const (
 
 var Version string = "devel"
 var (
-	cmd_play     bool
-	cmd_winpatch bool
+	cmd_opt_play  bool
+	cmd_opt_patch bool
 )
 var logger = log.New(os.Stderr)
 
@@ -40,9 +40,7 @@ var rootCmd = &cobra.Command{
 func Execute() {
 	if len(os.Args) == 1 {
 		runBedmikun(rootCmd, []string{})
-		fmt.Println("\nPress Enter to exit...")
-		fmt.Scanln()
-		return
+		os.Exit(0)
 	}
 	err := fang.Execute(context.Background(), rootCmd)
 	if err != nil {
@@ -51,13 +49,7 @@ func Execute() {
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
 	rootCmd.SetVersionTemplate("Bedmikun, version: " + Version)
-	//rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.bedmikun.yaml)")
-	rootCmd.PersistentFlags().BoolVarP(&cmd_play, "play", "g", false, "Play the game.")
-	rootCmd.PersistentFlags().BoolVarP(&cmd_winpatch, "patch", "w", false, "Patch the Minecraft.Windows.exe here.")
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
+	rootCmd.PersistentFlags().BoolVarP(&cmd_opt_play, "play", "g", false, "Play the game.")
+	rootCmd.PersistentFlags().BoolVarP(&cmd_opt_patch, "patch", "w", false, "Patch the Minecraft.Windows.exe here.")
 }

@@ -1,34 +1,35 @@
 package cmd
 
 import (
-	"github.com/charmbracelet/huh"
-	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
-)
 
-var (
-	useDetectedPath bool
-	action          string
+	"github.com/charmbracelet/huh"
+	"github.com/spf13/cobra"
 )
 
 func runBedmikun(cmd *cobra.Command, args []string) {
-	if cmd_winpatch {
+	var (
+		useDetectedPath bool
+		action          string
+	)
+	if cmd_opt_patch {
 		if err := PatchFile("Minecraft.Windows.exe", false); err != nil {
 			logger.Fatal("Failed to patch file", "err", err)
 		}
 		os.Exit(0)
 	}
-	if cmd_play {
-		mcbe, err := GetMinecraftInfo()
+	if cmd_opt_play {
+		mcInfo, err := GetMinecraftInfo()
 		if err != nil {
 			logger.Fatal("Failed to get Minecraft info", "err", err)
-		} else if mcbe == nil {
+		} else if mcInfo == nil {
 			logger.Fatal("Minecraft is not installed or could not be found")
 		}
-		DRunBedrock(*mcbe)
+		DRunBedrock(mcInfo.Version, mcInfo.InstallLocation)
 		os.Exit(0)
 	}
+	var confirm bool
 	err := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
@@ -40,23 +41,30 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 					huh.NewOption("Exit", ActionExit),
 				).
 				Value(&action),
+			huh.NewConfirm().
+				Title("Get minecraft bedrock info").
+				Description("This will exec a pwsh to get the info.").
+				Value(&confirm),
 		).Title("Bedmikun - Bedrock unpaid patcher.").Description("Free selection to go."),
 	).Run()
 	if err != nil {
 		logger.Fatal("UI failed", "err", err)
 	}
-
-	mcInfo, err := GetMinecraftInfo()
-	if err != nil {
-		logger.Fatal("Failed to get Minecraft info", "err", err)
-	} else if mcInfo == nil {
-		logger.Fatal("Minecraft is not installed or could not be found")
-	}
-	if mcInfo != nil {
-		// Debug: full path
-		logger.Debug("Minecraft installed at", "path", mcInfo.InstallLocation)
-		// Info: only version
-		logger.Info("Minecraft installed", "version", mcInfo.Version)
+	var mcInfo *McAppInfo
+	if confirm {
+		mcbe, err := GetMinecraftInfo()
+		if err != nil {
+			logger.Fatal("Failed to get Minecraft info", "err", err)
+		} else if mcbe == nil {
+			logger.Fatal("Minecraft is not installed or could not be found")
+		}
+		mcInfo = mcbe
+		if mcbe != nil {
+			// Debug: full path
+			logger.Debug("Minecraft installed at", "path", mcInfo.InstallLocation)
+			// Info: only version
+			logger.Info("Minecraft installed", "version", mcInfo.Version)
+		}
 	}
 
 	switch action {
@@ -66,7 +74,7 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 		return
 
 	case ActionRun:
-		DRunBedrock(*mcInfo)
+		DRunBedrock(mcInfo.Version, mcInfo.InstallLocation)
 
 	case ActionPatch:
 		autodetectedPath := filepath.Join(mcInfo.InstallLocation, "Minecraft.Windows.exe")

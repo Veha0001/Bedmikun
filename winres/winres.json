@@ -1,12 +1,7 @@
 {
   "RT_GROUP_ICON": {
     "APP": {
-      "0000": [
-        "icon256.png",
-        "icon128.png",
-        "icon64.png",
-        "icon16.png"
-      ]
+      "0000": ["icon256.png", "icon128.png", "icon64.png", "icon16.png"]
     }
   },
   "RT_MANIFEST": {
@@ -18,8 +13,8 @@
         },
         "description": "",
         "minimum-os": "win10",
-        "execution-level": "as invoker",
-        "ui-access": true,
+        "execution-level": "",
+        "ui-access": false,
         "auto-elevate": true,
         "dpi-awareness": "system",
         "disable-theming": false,
@@ -30,7 +25,7 @@
         "printer-driver-isolation": false,
         "gdi-scaling": false,
         "segment-heap": false,
-        "use-common-controls-v6": true
+        "use-common-controls-v6": false
       }
     }
   },
@@ -38,14 +33,14 @@
     "#1": {
       "0000": {
         "fixed": {
-          "file_version": "0.0.1.1",
-          "product_version": "0.0.1.1"
+          "file_version": "0.1.0.0",
+          "product_version": "0.1.0.0"
         },
         "info": {
           "0409": {
             "Comments": "CLI to play Bedrock without Trial.",
             "CompanyName": "Non-profit",
-            "FileDescription": "Go play minecraft bedrock.",
+            "FileDescription": "GO! Play Minecraft Bedrock really.",
             "FileVersion": "0.0.1.10 ",
             "InternalName": "",
             "LegalCopyright": "@Veha0001",
@@ -53,7 +48,7 @@
             "OriginalFilename": "bedmikun.exe",
             "PrivateBuild": "",
             "ProductName": "Bedmikun",
-            "ProductVersion": "0.0.1.1 beta",
+            "ProductVersion": "0.1",
             "SpecialBuild": ""
           }
         }

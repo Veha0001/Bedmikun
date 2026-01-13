@@ -44,9 +44,9 @@ func GetMinecraftInfo() (*McAppInfo, error) {
 		if err := form.Run(); err == nil && openStore {
 			// Open the Microsoft Store to install Minecraft
 			_ = exec.Command("cmd", "/C", "start", "ms-windows-store://pdp/?productid=9NBLGGH2JHXJ").Run()
-			return nil, fmt.Errorf("Minecraft not found, opening Microsoft Store for installation")
+			return nil, fmt.Errorf("minecraft not found, opening Microsoft Store for installation")
 		}
-		return nil, fmt.Errorf("Minecraft UWP not found. Please install it via the Microsoft Store")
+		return nil, fmt.Errorf("minecraft UWP not found. Please install it via the Microsoft Store")
 	}
 
 	// Debug: Output the raw content to check what's being returned

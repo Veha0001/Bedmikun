@@ -203,13 +203,21 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer source.Close()
+	defer func() {
+		if err := source.Close(); err != nil {
+			logger.Fatal("failed to close source: %v", err)
+		}
+	}()
 
 	destination, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer destination.Close()
+	defer func() {
+		if err := destination.Close(); err != nil {
+			logger.Fatal("failed to close destination: %v", err)
+		}
+	}()
 	_, err = io.Copy(destination, source)
 	return err
 }

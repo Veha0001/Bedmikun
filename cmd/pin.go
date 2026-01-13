@@ -186,9 +186,9 @@ func generateTagCandidates(tag string) []string {
 	return out
 }
 
-func DRunBedrock(mcbe McAppInfo) {
-	pack := filepath.Join(mcbe.InstallLocation, "main.exe")
-	// If main.exe exists, ask the user whether to Play, Reinstall, or Cancel
+func DRunBedrock(ver string, installed_dir string) {
+	pack := filepath.Join(installed_dir, "Minecraft.main.exe")
+	// If Minecraft.main.exe exists, ask the user whether to Play, Reinstall, or Cancel
 	if _, err := os.Stat(pack); err == nil {
 		var confirm bool
 		form := huh.NewForm(
@@ -212,7 +212,7 @@ func DRunBedrock(mcbe McAppInfo) {
 			}
 			// continue to download flow
 		} else { // User selected "Play it!"
-			logger.Info("Found existing main.exe, launching...", "path", pack)
+			logger.Info("Found existing Minecraft.main.exe, launching...", "path", pack)
 			execCmd := exec.Command(pack)
 			execCmd.Stdout = os.Stdout
 			execCmd.Stderr = os.Stderr
@@ -224,19 +224,19 @@ func DRunBedrock(mcbe McAppInfo) {
 		}
 	}
 
-	// main.exe not found -> attempt to download
-	data, _, err := FetchGitAssetsbyTag("bubbles-wow", "mcbe-gdk-unpack-archive", "Minecraft.Windows.exe", mcbe.Version)
+	// Minecraft.main.exe not found -> attempt to download
+	data, _, err := FetchGitAssetsbyTag("bubbles-wow", "mcbe-gdk-unpack-archive", "Minecraft.Windows.exe", ver)
 	if err != nil || data == "" {
-		logger.Error("no downloadable asset found for requested or variant tags", "requested", mcbe.Version, "err", err)
+		logger.Error("no downloadable asset found for requested or variant tags", "requested", ver, "err", err)
 		return
 	}
 
-	logger.Info("Downloading Minecraft Bedrock.", "url", data, "dest", pack)
+	logger.Info("Downloading Decrypted Minecraft Bedrock.", "url", data, "dest", pack)
 	if err := GetDownload(data, pack); err != nil {
 		logger.Error("download failed", err)
-		// If download failed but main.exe exists, run it
+		// If download failed but Minecraft.main.exe exists, run it
 		if _, statErr := os.Stat(pack); statErr == nil {
-			logger.Warn("download failed, running existing main.exe", "path", pack)
+			logger.Warn("download failed, running existing Minecraft.main.exe", "path", pack)
 			execCmd := exec.Command(pack)
 			execCmd.Stdout = os.Stdout
 			execCmd.Stderr = os.Stderr
@@ -249,7 +249,7 @@ func DRunBedrock(mcbe McAppInfo) {
 		return
 	}
 
-	// Attempt to patch the downloaded main.exe (backup disabled)
+	// Attempt to patch the downloaded Minecraft.main.exe (backup disabled)
 	if err := PatchFile(pack, false); err != nil {
 		logger.Error("patch failed", "err", err)
 		// still try to launch the downloaded file

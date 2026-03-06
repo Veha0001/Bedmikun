@@ -1,8 +1,10 @@
 # Bedmikun
 
-is some how to play bedrock without damage the wallet. :0
+![Aredbrid](https://github.com/Veha0001/Bedmikun/blob/main/winres/icon256.png)
 
-## Anoun
+You can play Minecraft bedrock without damaging the wallet. :0
+
+## Update
 
 its not work great. and im not like to maintain any of this things.
 

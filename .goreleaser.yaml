@@ -22,6 +22,13 @@ builds:
     targets:
       - "windows_amd64"
 
+signs:
+  - cmd: cosign
+    stdin: "{{ .Env.COSIGN_PWD }}"
+    args:
+      ["sign-blob", "-key=cosign.key", "-output=${signature}", "${artifact}"]
+    artifacts: checksum
+
 archives:
   - formats: [tar.gz]
     # this name template makes the OS and Arch compatible with the results of `uname`.

@@ -3,12 +3,22 @@ package cmd
 import (
 	"os"
 	"path/filepath"
-
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
+var style_b = lipgloss.NewStyle().
+    Bold(true).
+    Foreground(lipgloss.Color("#FAFAFA")).
+    Background(lipgloss.Color("#7D56F4")).
+    Padding(1, 2).
+    PaddingChar('·').
+    Margin(1, 2).
+    MarginChar('/').
+    Width(18)
 
 func runBedmikun(cmd *cobra.Command, args []string) {
+	lipgloss.Println(style_b.Render("Hello, Bedmikun"))
 	var (
 		useDetectedPath bool
 		action          string
@@ -29,11 +39,10 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 		DRunBedrock(mcInfo.Version, mcInfo.InstallLocation)
 		os.Exit(0)
 	}
-	var confirm bool
 	err := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
-				Title("Select Action").
+				Title("Select an Action").
 				Options(
 					huh.NewOption("Run", ActionRun),
 					huh.NewOption("Patch", ActionPatch),
@@ -41,31 +50,19 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 					huh.NewOption("Exit", ActionExit),
 				).
 				Value(&action),
-			huh.NewConfirm().
-				Title("Get minecraft bedrock info").
-				Description("This will exec a pwsh to get the info.").
-				Value(&confirm),
-		).Title("Bedmikun - Bedrock unpaid patcher.").Description("Free selection to go."),
+		).Title("Bedrock-unpaid patcher.").Description("Free selection to go."),
 	).Run()
 	if err != nil {
 		logger.Fatal("UI failed", "err", err)
 	}
 	var mcInfo *McAppInfo
-	if confirm {
-		mcbe, err := GetMinecraftInfo()
-		if err != nil {
-			logger.Fatal("Failed to get Minecraft info", "err", err)
-		} else if mcbe == nil {
-			logger.Fatal("Minecraft is not installed or could not be found")
-		}
-		mcInfo = mcbe
-		if mcbe != nil {
-			// Debug: full path
-			logger.Debug("Minecraft installed at", "path", mcInfo.InstallLocation)
-			// Info: only version
-			logger.Info("Minecraft installed", "version", mcInfo.Version)
-		}
+	mcbe, err := GetMinecraftInfo()
+	if err != nil {
+		logger.Fatal("Failed to get Minecraft info", "err", err)
+	} else if mcbe == nil {
+		logger.Fatal("Minecraft is not installed or could not be found")
 	}
+	mcInfo = mcbe
 
 	switch action {
 

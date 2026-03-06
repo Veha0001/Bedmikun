@@ -197,7 +197,8 @@ func DRunBedrock(ver string, installed_dir string) {
 					Title("Found a patched Minecraft Bedrock.").
 					Affirmative("Reinstall.").
 					Negative("Play it!").
-					Value(&confirm),
+					Value(&confirm).
+					Description("This will reinstall the patched Minecraft Bedrock.\nPress Ctrl+C to close."),
 			),
 		)
 		if err := form.Run(); err != nil {

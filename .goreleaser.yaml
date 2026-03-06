@@ -25,8 +25,15 @@ builds:
 signs:
   - cmd: cosign
     stdin: "{{ .Env.COSIGN_PWD }}"
+    signature: "${artifact}.sigstore.json"
     args:
-      ["sign-blob", "-key=cosign.key", "-output=${signature}", "${artifact}"]
+      [
+        "sign-blob",
+        "--key=cosign.key",
+        "--bundle=${signature}",
+        "${artifact}",
+        "--yes",
+      ]
     artifacts: checksum
 
 archives:

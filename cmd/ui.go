@@ -3,22 +3,22 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+
 	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/tree"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
-var style_b = lipgloss.NewStyle().
-    Bold(true).
-    Foreground(lipgloss.Color("#FAFAFA")).
-    Background(lipgloss.Color("#7D56F4")).
-    Padding(1, 2).
-    PaddingChar('·').
-    Margin(1, 2).
-    MarginChar('/').
-    Width(18)
 
 func runBedmikun(cmd *cobra.Command, args []string) {
-	lipgloss.Println(style_b.Render("Hello, Bedmikun"))
+	lip_troot := tree.Root("* Hello, Bedmikun").
+		Child("Made by: @Veha0001", "unpacked-archive: @bubbles-wow", "ChuCHu! (O_O )?").
+		Enumerator(tree.RoundedEnumerator)
+	_, lip_terr := lipgloss.Println(lip_troot)
+	if lip_terr != nil {
+		logger.Fatal("Error to make a lipgloss tree")
+	}
+
 	var (
 		useDetectedPath bool
 		action          string
@@ -50,7 +50,7 @@ func runBedmikun(cmd *cobra.Command, args []string) {
 					huh.NewOption("Exit", ActionExit),
 				).
 				Value(&action),
-		).Title("Bedrock-unpaid patcher.").Description("Free selection to go."),
+		).Title("Bedrock-unpaid patcher.").Description(" Free selection to go.\n Press Ctrl+C to close."),
 	).Run()
 	if err != nil {
 		logger.Fatal("UI failed", "err", err)

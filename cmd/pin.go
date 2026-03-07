@@ -187,7 +187,7 @@ func generateTagCandidates(tag string) []string {
 }
 
 func DRunBedrock(ver string, installed_dir string) {
-	pack := filepath.Join(installed_dir, "Minecraft.main.exe")
+	pack := filepath.Join(installed_dir, "Game.exe")
 	// If Minecraft.main.exe exists, ask the user whether to Play, Reinstall, or Cancel
 	if _, err := os.Stat(pack); err == nil {
 		var confirm bool
@@ -196,9 +196,9 @@ func DRunBedrock(ver string, installed_dir string) {
 				huh.NewConfirm().
 					Title("Found a patched Minecraft Bedrock.").
 					Affirmative("Reinstall.").
-					Negative("Play it!").
+					Negative("Play Now!").
 					Value(&confirm).
-					Description("This will reinstall the patched Minecraft Bedrock.\nPress Ctrl+C to close."),
+					Description("This will reinstall the game patched..."),
 			),
 		)
 		if err := form.Run(); err != nil {
@@ -213,14 +213,14 @@ func DRunBedrock(ver string, installed_dir string) {
 			}
 			// continue to download flow
 		} else { // User selected "Play it!"
-			logger.Info("Found existing Minecraft.main.exe, launching...", "path", pack)
+			logger.Info("Found existing game, launching...", "path", pack)
 			execCmd := exec.Command(pack)
 			execCmd.Stdout = os.Stdout
 			execCmd.Stderr = os.Stderr
 			if err := execCmd.Start(); err != nil {
 				logger.Fatal("Failed to launch Minecraft", "err", err)
 			}
-			logger.Info("Minecraft Bedrock started.")
+			logger.Info("Opening Minecraft Bedrock...")
 			return
 		}
 	}
@@ -237,14 +237,14 @@ func DRunBedrock(ver string, installed_dir string) {
 		logger.Error("download failed", err)
 		// If download failed but Minecraft.main.exe exists, run it
 		if _, statErr := os.Stat(pack); statErr == nil {
-			logger.Warn("download failed, running existing Minecraft.main.exe", "path", pack)
+			logger.Warn("download failed, running existing executable", "path", pack)
 			execCmd := exec.Command(pack)
 			execCmd.Stdout = os.Stdout
 			execCmd.Stderr = os.Stderr
 			if err := execCmd.Start(); err != nil {
 				logger.Fatal("Failed to launch Minecraft", "err", err)
 			}
-			logger.Info("Minecraft Bedrock started.")
+			logger.Info("Opening Minecraft Bedrock...")
 			return
 		}
 		return
@@ -263,7 +263,7 @@ func DRunBedrock(ver string, installed_dir string) {
 	if err := execCmd.Start(); err != nil {
 		logger.Fatal("Failed to launch Minecraft", "err", err)
 	}
-	logger.Info("Minecraft Bedrock started.")
+	logger.Info("Opening Minecraft Bedrock...")
 }
 
 // versionsMatch compares two version strings and returns true when they should be
